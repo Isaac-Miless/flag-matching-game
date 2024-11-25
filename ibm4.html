@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flag Matcher</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css?family=Poppins:100,100italic,200,200italic,300,300italic,regular,italic,500,500italic,600,600italic,700,700italic,800,800italic,900,900italic"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --dark-blue: #219ebc;
+        --highlight: #045781;
+        --sel-highlight: #fb8500;
+        --light-gray: #5251514a;
+        --gray: #5251518d;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Poppins", sans-serif;
+        color: #023047;
+        text-align: center;
+        min-height: 100vh;
+        /* background: linear-gradient(45deg, #8ecae6, #219ebc); */
+        background: linear-gradient(
+          45deg,
+          #8ecae6 15%,
+          /* Light blue section */ #fb8500 15%,
+          /* Start of first stripe */ #fb8500 18%,
+          /* End of first stripe */ #219ebc 18%,
+          /* Blue section between stripes */ #219ebc 85%,
+          /* End of blue section */ #fb8500 85%,
+          /* Start of second stripe */ #fb8500 88%,
+          /* End of second stripe */ #8ecae6 88% /* Light blue section */
+        );
+        margin-bottom: 50px;
+      }
+
+      h1 {
+        margin-top: 50px;
+        font-size: 3rem;
+      }
+
+      h2 {
+        font-size: 2rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+
+      #highlight {
+        color: var(--highlight);
+        font-weight: bold;
+      }
+
+      .seperate {
+        margin-top: 50px;
+      }
+
+      form {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        margin-top: 20px;
+      }
+
+      input[type="radio"] {
+        display: none;
+      }
+
+      input[type="radio"] + label {
+        display: inline-block;
+        margin: 0 1rem;
+        padding: 0.5rem 1rem;
+        border: 3px solid var(--light-gray);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: border 0.3s ease-in-out;
+      }
+
+      .card:hover:not(.answer),
+      input[type="radio"]:hover + label {
+        border: 3px solid var(--gray);
+      }
+
+      input[type="radio"]:checked + label {
+        border: 3px solid var(--sel-highlight);
+      }
+
+      .answer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .answer img {
+        width: 60%;
+        height: 40%;
+        object-fit: contain;
+      }
+
+      .board {
+        width: 80%;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(
+          auto-fit,
+          minmax(150px, 1fr)
+        ); /* Adjust the column count based on space */
+        gap: 3rem;
+        margin-top: 20px;
+      }
+
+      @media (min-width: 720px) {
+        .board {
+          grid-template-columns: repeat(
+            4,
+            1fr
+          ); /* Force 4 columns on larger screens */
+        }
+      }
+
+      .card {
+        width: 100%;
+        height: 200px; /* Set a consistent height for all cards */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 3px solid var(--light-gray);
+        border-radius: 0.5rem;
+        background-color: transparent;
+        background-image: linear-gradient(
+          45deg,
+          rgba(255, 255, 255, 0.1),
+          rgba(0, 0, 0, 0.1)
+        );
+        backdrop-filter: blur(20px);
+        cursor: pointer;
+        transition: border 0.3s ease-in-out;
+        /* background-color: lightgray; */
+        overflow: hidden; /* Hide any content that overflows the card */
+      }
+
+      .flag {
+        width: 100%;
+        height: 100%; /* Ensure the image takes the full height of the card */
+        object-fit: contain; /* Maintain aspect ratio and ensure the image covers the card */
+      }
+
+      button {
+        margin: 0 1rem;
+        font-size: 1rem;
+        padding: 0.75rem 1rem;
+        border: 3px solid var(--light-gray);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        background: var(--dark-blue);
+        outline: none;
+        transition: border 0.3s ease-in-out, color 0.3s ease-in-out;
+      }
+
+      button:hover {
+        border-color: var(--gray);
+      }
+
+      button:active {
+        border: 3px solid var(--sel-highlight);
+      }
+
+      #show-answer {
+        margin: 0 auto;
+      }
+
+      #board-size-section,
+      #number-of-matches,
+      #show-answer,
+      #answers {
+        display: none;
+      }
+    </style>
+    <script>
+      // API URL to fetch country data based on the selected region
+      const api =
+        "https://www.cs.kent.ac.uk/people/staff/yh/api/country-data/countries/region";
+
+      // jQuery ready function to ensure the DOM is fully loaded
+      $(document).ready(function () {
+        let region = ""; // Selected Region
+        let boardSize = "";
+        let matches = 0;
+        let selectedCardClass = "";
+        let totalMatches = 0; // Total number of matches required for the game to finish
+        const answerCards = []; // Initialize answerCards as an empty array
+
+        // Event listener for region selection
+        $('#region-select input[type="radio"]').on("change", function () {
+          region = $(this).val();
+          checkSelections();
+          showBoardSizeOptions(); // Show board size options when a region is selected
+        });
+
+        // Event listener for board size selection
+        $('#board-size input[type="radio"]').on("change", function () {
+          boardSize = $(this).val();
+          checkSelections();
+        });
+
+        // Event listener for the show answer button
+        $("#show-answer").on("click", function () {
+          // Toggle the visibility of the answers
+          if ($("#answers").is(":visible")) {
+            $("#answers").hide();
+          } else {
+            $("#answers").css("display", "grid");
+          }
+        });
+
+        // Function to check if both region and board size are selected
+        function checkSelections() {
+          if (region && boardSize) {
+            // Both region and board size are selected, make the API call
+            fetchRegionData();
+            // show answer button & number of matches
+            $("#number-of-matches").text("Number of Matches: 0").show();
+            $("#show-answer").show();
+          }
+        }
+        ß;
+        // Function to show board size options when region is selected
+        function showBoardSizeOptions() {
+          $("#board-size-section").show();
+        }
+
+        // Function to get the last class name of an element
+        function getLastClassName(element) {
+          return element.attr("class").split(" ").pop();
+        }
+
+        // Function to create the board based on the data
+        // Dynamically Set the Grid Columns Based on Board Size
+        function createBoard(data) {
+          const board = $("#game-options");
+          const answers = $("#answers");
+          board.empty(); // Clear the board before creating new cards
+          answers.empty(); // Clear the answers before creating new cards
+
+          const boardSizeArr = boardSize.split("x");
+          const cols = parseInt(boardSizeArr[0]);
+          const rows = parseInt(boardSizeArr[1]);
+
+          // Set the total number of matches required
+          totalMatches = (rows * cols) / 2;
+
+          // Prepare an array to hold both flag and country/capital cards
+          let cardArray = [];
+          let answerCards = []; // Initialize answerCards as an empty array
+
+          // Shuffle the data to randomize the countries
+          data.sort(() => Math.random() - 0.5);
+
+          // Create the flag and country/capital cards
+          for (let i = 0; i < (rows * cols) / 2; i++) {
+            const className = `${data[i].name}-${data[i].capital}`
+              .split(" ")
+              .join(""); // Remove spaces from the class name
+
+            // Flag cards
+            const flagCard = $(`<div class='card ${className}'></div>`);
+            const flag = $("<img class='flag' />").attr("src", data[i].flag);
+            flagCard.append(flag);
+
+            // Country and Capital cards
+            const countryCard = $(`<div class='card ${className}'></div>`);
+            const country = $("<p class='country'></p>").text(data[i].name);
+            const capital = $("<p class='capital'></p>").text(
+              `Capital: ${data[i].capital}`
+            );
+            countryCard.append(country.clone(), capital.clone());
+
+            // Answer Card
+            const answerCard = $(`<div class='card answer'></div>`);
+            answerCard.append(
+              $("<p class='country'></p>").text(data[i].name),
+              $("<p class='capital'></p>").text(`Capital: ${data[i].capital}`),
+              $("<img class='flag' />").attr("src", data[i].flag)
+            );
+
+            // Add click event to the cards
+            flagCard.on("click", selectCard);
+            countryCard.on("click", selectCard);
+
+            // Add both flag and country cards to the array
+            cardArray.push(flagCard);
+            cardArray.push(countryCard);
+
+            // Add answer card to the answerCards array
+            answerCards.push(answerCard);
+          }
+
+          // Shuffle and add the cards to the board
+          cardArray.sort(() => Math.random() - 0.5);
+          board.append(cardArray);
+
+          // Append each answer card to the #answers div
+          answerCards.forEach((card) => answers.append(card));
+        }
+
+        // Function to select card
+        function selectCard() {
+          if (selectedCardClass === "") {
+            selectedCardClass = getLastClassName($(this));
+            $(this).css("border-color", "#fb8500");
+          } else checkMatch($(this));
+        }
+
+        // Function to check if the selected cards match
+        function checkMatch(card) {
+          if (selectedCardClass === getLastClassName(card)) {
+            matches++;
+            $(`.${selectedCardClass}`).css("border-color", "#90a955");
+            $(`.${selectedCardClass}`).off("click");
+            $(`.${selectedCardClass}`).css("pointer-events", "none");
+            $(`.${selectedCardClass}`).css("cursor", "default");
+          } else $(`.${selectedCardClass}`).css("border-color", "#5251514a");
+
+          selectedCardClass = "";
+
+          // Update Matches
+          if (matches === totalMatches) {
+            $("#number-of-matches").text(
+              `Congratulations! You have matched all the flags and countries.`
+            );
+            matches = 0;
+          } else $("#number-of-matches").text(`Number of Matches: ${matches}`);
+        }
+
+        // Function to get data based on the selected region
+        function fetchRegionData() {
+          // Call the API to get the data based on the selected region with jQuery
+          $.getJSON(`${api}/${region}`, function (data) {
+            createBoard(data);
+          }).fail(function () {
+            console.error("Failed to fetch data");
+          });
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <h1>Flag <span id="highlight">Matcher </span></h1>
+    <p>Can you match the flag to the Country?</p>
+
+    <!-- Region Selection -->
+    <h2 class="seperate">Select a Region</h2>
+    <form id="region-select">
+      <input
+        type="radio"
+        name="region-input"
+        id="africa"
+        value="africa"
+        required
+      />
+      <label for="africa">Africa</label>
+
+      <input type="radio" name="region-input" id="asia" value="asia" required />
+      <label for="asia">Asia</label>
+
+      <input
+        type="radio"
+        name="region-input"
+        id="europe"
+        value="europe"
+        required
+      />
+      <label for="europe">Europe</label>
+
+      <input
+        type="radio"
+        name="region-input"
+        id="americas"
+        value="americas"
+        required
+      />
+      <label for="americas">Americas</label>
+
+      <input
+        type="radio"
+        name="region-input"
+        id="oceania"
+        value="oceania"
+        required
+      />
+      <label for="oceania">Oceania</label>
+    </form>
+
+    <!-- Board Size Selection -->
+    <div id="board-size-section">
+      <h2 class="seperate" id="select-board-size">Select Board Size</h2>
+      <form id="board-size">
+        <input type="radio" name="board-size" id="4x2" value="4x2" required />
+        <label for="4x2">4x2</label>
+
+        <input type="radio" name="board-size" id="4x4" value="4x4" required />
+        <label for="4x4">4x4</label>
+      </form>
+    </div>
+
+    <!-- Board -->
+    <div id="game-options" class="board">
+      <!-- Cards will be dynamically added here -->
+    </div>
+
+    <p id="number-of-matches">Number of Matches:</p>
+    <button id="show-answer">Show Answer</button>
+
+    <div id="answers" class="board">
+      <!-- Answer cards will be dynamically added here -->
+    </div>
+  </body>
+</html>
